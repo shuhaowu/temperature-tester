@@ -1,0 +1,58 @@
+#!/bin/bash
+
+set -e
+
+DURATION=${1:-20m}
+SYSTEM=${2:-rpi}
+
+BEFORE_DURATION=30
+AFTER_DURATION=300
+
+measure_data_and_print_once_rpi() {
+  time=$(date +"%Y-%m-%d %H:%M:%S")
+  temp=$(vcgencmd measure_temp | cut -f 2 -d '=' | cut -f 1 -d "'")
+  freq=$(vcgencmd measure_clock arm | cut -f 2 -d '=')
+  freq=$((freq / 1000)) # in khz
+  echo "$time,$temp,$freq,$freq,$test_running"
+}
+
+measure_data_and_print_once_armbian() {
+  time=$(date +"%Y-%m-%d %H:%M:%S")
+  temp=$(cat /sys/devices/virtual/thermal/thermal_zone*/temp  | awk '{ sum += $1; n++ } END { print sum/n/1000; }')
+  # Maximum frequency only
+  freqmax=$(cat /sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_cur_freq | sort -n --reverse | head -n1)
+  freqmin=$(cat /sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_cur_freq | sort -n | head -n1)
+  echo "$time,$temp,$freqmin,$freqmax,$test_running"
+}
+
+log_data_and_wait_for_process() {
+  while true; do
+    measure_data_and_print_once_$SYSTEM
+    if ! ps -p $1 >/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+
+  wait $1
+}
+
+if ! which stress-ng >/dev/null; then
+  echo "error: stress-ng is not installed" >&2
+  exit 1
+fi
+
+
+echo "stress testing starting in ${BEFORE_DURATION} seconds" >&2
+test_running=0
+sleep $BEFORE_DURATION &
+log_data_and_wait_for_process $!
+
+test_running=1
+stress-ng -c $(nproc) --cpu-method fft --timeout ${DURATION} >&2 &
+log_data_and_wait_for_process $!
+
+echo "stress testing complete, sleeping ${AFTER_DURATION}s before exiting" >&2
+test_running=0
+sleep $AFTER_DURATION &
+log_data_and_wait_for_process $!
