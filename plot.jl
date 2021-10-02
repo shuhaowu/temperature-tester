@@ -16,7 +16,7 @@ begin
 	Pkg.add("CSV")
 	Pkg.add("PyPlot")
 	using DataFrames, CSV, PyPlot
-	using Dates
+	using Dates, Statistics
 end
 
 # ╔═╡ 50c3de39-f80c-4168-8610-215ebcf2b74a
@@ -56,8 +56,11 @@ function plot_comparison(datafiles, dataframes; time_limit, frequency_limit)
 	lines = []
 	
 	for (i, df) in enumerate(dataframes)
-		(l, ) = ax.plot(df.Time, df.Temp, label=datafiles[i]["title"])
-		ax2.plot(df.Time, df.FreqMax ./ 1000, "x")
+		average_frequency = round(mean(df.FreqMax[df.TestRunning .== 1]) / 1000)
+		
+		(l, ) = ax.plot(df.Time, df.Temp, label=datafiles[i]["title"] * ": " * string(average_frequency) * "Mhz")
+		ax2.plot(df.Time, df.FreqMax ./ 1000, ".")
+				
 		push!(lines, l)
 	end
 	
@@ -91,7 +94,7 @@ begin
 	odroid_datafiles = [
 		Dict(
 			"filename" => "data/odroid-northbridge-heatsink-5v-fan.csv",
-			"title"    => "ODroid XU4 + Northbridge heatsink + 5V fan (always running at 100%)",
+			"title"    => "ODroid XU4 + Northbridge heatsink + 5V fan (always on)",
 			"header"   => default_header,
 		),
 		Dict(
@@ -113,14 +116,35 @@ md"""
 begin
 	rpi_datafiles = [
 		Dict(
-			"filename" => "data/rpi4-3_3vfan-2_0ghz.csv",
+			"filename" => "data/rpi4-3_3vfan-2_0ghz-suck.csv",
 			"title"    => "Pi 4 2.0Ghz OC + 3.3V fan (suck)",
 			# This is done with an older measure script.
 			"header"   => ["Time", "Temp", "FreqMax", "Throttled", "TestRunning"],
 		),
+		Dict(
+			"filename" => "data/rpi4-3_3vfan-2_0ghz-blow.csv",
+			"title"    => "Pi 4 2.0Ghz OC + 3.3V fan (blow)",
+			"header"   => default_header,
+		),
+		Dict(
+			"filename" => "data/rpi4-5vfan-2_0ghz-blow.csv",
+			"title"    => "Pi 4 2.0Ghz OC + 5V fan (blow)",
+			"header"   => default_header,
+		),
+		Dict(
+			"filename" => "data/rpi4-5vfan-alheatsink-2_0ghz-blow.csv",
+			"title"    => "Pi 4 2.0Ghz OC + 5V fan (blow) + Al heatsink",
+			"header"   => default_header,
+		),
+		Dict(
+			"filename" => "data/rpi4-3.3vfan-alheatsink-2_0ghz-blow.csv",
+			"title"    => "Pi 4 2.0Ghz OC + 3.3V fan (blow) + Al heatsink",
+			"header"   => default_header,
+		),
 	]
 	
-	plot_comparison(rpi_datafiles, load_multiple_dataframes(rpi_datafiles); time_limit=(0, 1200), frequency_limit=(400, 2200))
+	rpi_dataframes = load_multiple_dataframes(rpi_datafiles)
+	plot_comparison(rpi_datafiles, rpi_dataframes; time_limit=(0, 1200), frequency_limit=(400, 2200))
 end
 
 # ╔═╡ Cell order:
@@ -128,7 +152,7 @@ end
 # ╠═87e65d24-d605-4afc-bdc7-7b677af0aa72
 # ╟─50c3de39-f80c-4168-8610-215ebcf2b74a
 # ╟─08cf40fb-49cf-4cae-b010-e9697bb5ff0b
-# ╠═959f9723-78eb-4105-868e-c4d9eecc9bd1
+# ╟─959f9723-78eb-4105-868e-c4d9eecc9bd1
 # ╟─80a3404d-65ad-4233-8547-0bfb5b0a0ef4
 # ╠═d1a2865d-9570-446f-bed6-5eb000941736
 # ╠═b23c1fe1-b913-44c0-869b-2cb8c747d786
